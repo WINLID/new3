@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Spese e Bilancio - IE11</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background-color: #f3f4f6;
+            color: #201f1e;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #107c41; /* Verde scuro stile contabilità */
+            color: white;
+            padding: 20px;
+            border-radius: 3px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .card {
+            background: #ffffff;
+            padding: 20px;
+            border: 1px solid #e1dfdd;
+            border-radius: 3px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #107c41;
+            border-bottom: 2px solid #107c41;
+            padding-bottom: 5px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 10px;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 95%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #a19f9d;
+            font-size: 14px;
+        }
+        button {
+            background-color: #107c41;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0b5930;
+        }
+        .btn-scarica {
+            background-color: #0078d4; /* Blu per l'esportazione */
+        }
+        .btn-scarica:hover {
+            background-color: #005a9e;
+        }
+        .tabella-spese {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .tabella-spese th, .tabella-spese td {
+            border: 1px solid #a19f9d;
+            padding: 8px;
+            text-align: left;
+        }
+        .tabella-spese th {
+            background-color: #f3f2f1;
+        }
+        .bilancio-box {
+            font-size: 20px;
+            font-weight: bold;
+            padding: 15px;
+            background: #edebe9;
+            border-left: 5px solid #107c41;
+            margin-top: 15px;
+        }
+        .positivo { color: #107c41; }
+        .negativo { color: #a80000; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Calcolatore di Bilancio Familiare</h1>
+        <p>Utility offline per il conteggio delle spese con esportazione sicura per Windows 7 / IE11</p>
+    </div>
+
+    <!-- FORM INSERIMENTO -->
+    <div class="card">
+        <h2>💰 Inserisci Movimento</h2>
+        
+        <label for="descrizione">Descrizione Voce:</label>
+        <input type="text" id="descrizione" placeholder="Es. Stipendio, Spesa Alimentare, Bolletta...">
+
+        <label for="importo">Importo (€):</label>
+        <input type="number" id="importo" step="0.01" placeholder="0.00">
+
+        <label for="tipo">Tipo Movimento:</label>
+        <select id="tipo">
+            <option value="entrata">Entrata (+)</option>
+            <option value="uscita">Uscita (-)</option>
+        </select>
+
+        <button id="btnAggiungi">Aggiungi al Bilancio</button>
+    </div>
+
+    <!-- RIEPILOGO E TABELLA -->
+    <div class="card">
+        <h2>📊 Registro Movimenti</h2>
+        
+        <table class="tabella-spese">
+            <thead>
+                <tr>
+                    <th>Descrizione</th>
+                    <th>Tipo</th>
+                    <th>Importo</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabella">
+                <!-- I dati volatili appariranno qui -->
+            </tbody>
+        </table>
+
+        <div class="bilancio-box">
+            Stato Bilancio Totale: <span id="totaleBilancio" class="positivo">0.00 €</span>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button id="btnScarica" class="btn-scarica">💾 Scarica Resoconto (.txt)</button>
+            <button id="btnResetta" style="background-color: #a80000;">Svuota Registro</button>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    // Array volatile per memorizzare i dati senza toccare il localStorage
+    var movimenti = [];
+
+    var descrizioneInput = document.getElementById("descrizione");
+    var importoInput = document.getElementById("importo");
+    var tipoSelect = document.getElementById("tipo");
+    var corpoTabella = document.getElementById("corpoTabella");
+    var totaleBilancio = document.getElementById("totaleBilancio");
+
+    // Funzione per aggiornare la tabella e il calcolo totale
+    function aggiornaBilancio() {
+        corpoTabella.innerHTML = "";
+        var saldo = 0;
+
+        if (movimenti.length === 0) {
+            corpoTabella.innerHTML = "<tr><td colspan='3' style='text-align:center; color:#666;'>Nessun movimento inserito.</td></tr>";
+            totaleBilancio.innerHTML = "0.00 €";
+            totaleBilancio.className = "positivo";
+            return;
+        }
+
+        for (var i = 0; i < movimenti.length; i++) {
+            var m = movimenti[i];
+            var riga = document.createElement("tr");
+
+            var cellaDesc = document.createElement("td");
+            cellaDesc.innerHTML = m.descrizione;
+            
+            var cellaTipo = document.createElement("td");
+            cellaTipo.innerHTML = m.tipo === "entrata" ? "Entrata" : "Uscita";
+            
+            var cellaImp = document.createElement("td");
+            if (m.tipo === "entrata") {
+                cellaImp.innerHTML = "+ " + m.importo.toFixed(2) + " €";
+                cellaImp.style.color = "#107c41";
+                saldo += m.importo;
+            } else {
+                cellaImp.innerHTML = "- " + m.importo.toFixed(2) + " €";
+                cellaImp.style.color = "#a80000";
+                saldo -= m.importo;
+            }
+
+            riga.appendChild(cellaDesc);
+            riga.appendChild(cellaTipo);
+            riga.appendChild(cellaImp);
+            corpoTabella.appendChild(riga);
+        }
+
+        totaleBilancio.innerHTML = saldo.toFixed(2) + " €";
+        if (saldo >= 0) {
+            totaleBilancio.className = "positivo";
+        } else {
+            totaleBilancio.className = "negativo";
+        }
+    }
+
+    // Inizializza tabella vuota
+    aggiornaBilancio();
+
+    // Bottone Aggiungi
+    document.getElementById("btnAggiungi").addEventListener("click", function() {
+        var desc = descrizioneInput.value.trim();
+        var imp = parseFloat(importoInput.value);
+
+        if (desc === "" || isNaN(imp) || imp <= 0) {
+            alert("Inserisci una descrizione valida e un importo maggiore di zero.");
+            return;
+        }
+
+        movimenti.push({
+            descrizione: desc,
+            importo: imp,
+            tipo: tipoSelect.value
+        });
+
+        // Pulisci i campi di testo
+        descrizioneInput.value = "";
+        importoInput.value = "";
+        
+        aggiornaBilancio();
+    });
+
+    // Bottone Resetta tutto
+    document.getElementById("btnResetta").addEventListener("click", function() {
+        movimenti = [];
+        aggiornaBilancio();
+    });
+
+    // Scarica File di Testo compatibile IE11
+    document.getElementById("btnScarica").addEventListener("click", function() {
+        if (movimenti.length === 0) {
+            alert("Il registro è vuoto. Inserisci dei movimenti prima di scaricare.");
+            return;
+        }
+
+        var testoFile = "RESOCONTO BILANCIO FAMILIARE\r\n";
+        testoFile += "Data esportazione: " + new Date().toLocaleString() + "\r\n";
+        testoFile += "========================================\r\n\r\n";
+
+        var saldoCalcolato = 0;
+        for (var i = 0; i < movimenti.length; i++) {
+            var m = movimenti[i];
+            var segno = m.tipo === "entrata" ? "(+) " : "(-) ";
+            testoFile += "- " + m.descrizione + ": " + segno + m.importo.toFixed(2) + " e\r\n"; // Usiamo 'e' invece del simbolo euro per evitare problemi di codifica caratteri su vecchi notepad
+            if (m.tipo === "entrata") {
+                saldoCalcolato += m.importo;
+            } else {
+                saldoCalcolato -= m.importo;
+            }
+        }
+
+        testoFile += "\r\n========================================\r\n";
+        testoFile += "BILANCIO FINALE: " + saldoCalcolato.toFixed(2) + " e\r\n";
+
+        // Funzione di download nativa e sicura per IE11
+        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+            var blob = new Blob([testoFile], { type: "text/plain;charset=utf-8;" });
+            window.navigator.msSaveOrOpenBlob(blob, "bilancio-spese.txt");
+        } else {
+            // Backup standard per browser moderni
+            var elementoAncorato = document.createElement("a");
+            elementoAncorato.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(testoFile));
+            elementoAncorato.setAttribute("download", "bilancio-spese.txt");
+            elementoAncorato.style.display = "none";
+            document.body.appendChild(elementoAncorato);
+            elementoAncorato.click();
+            document.body.removeChild(elementoAncorato);
+        }
+    });
+</script>
+
+</body>
+</html>
